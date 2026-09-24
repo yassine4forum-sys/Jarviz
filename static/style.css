@@ -2750,6 +2750,10 @@
   .voice-mode-indicator.listening{background:var(--error);animation:voice-mode-pulse 1s ease-in-out infinite;}
   .voice-mode-indicator.speaking{background:var(--accent);animation:voice-mode-pulse 1.5s ease-in-out infinite;}
   .voice-mode-indicator.thinking{background:var(--warning,#f59e0b);animation:voice-mode-pulse 2s ease-in-out infinite;}
+  .voice-mode-indicator[data-state="connecting"],.voice-mode-indicator[data-state="working"]{background:var(--warning,#f59e0b);animation:voice-mode-pulse 2s ease-in-out infinite;}
+  .voice-mode-indicator[data-state="listening"]{background:var(--error);animation:voice-mode-pulse 1s ease-in-out infinite;}
+  .voice-mode-indicator[data-state="speaking"]{background:var(--accent);animation:voice-mode-pulse 1.5s ease-in-out infinite;}
+  .voice-mode-indicator[data-state="error"]{background:var(--error);}
   .voice-mode-label{color:var(--muted);font-size:11px;}
   @keyframes voice-mode-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(.85);}}
   .status-text{font-size:11px;color:var(--muted);padding-left:4px;}
@@ -4936,16 +4940,18 @@ main.main > #mainSettings,
 main.main > #mainSkills,
 main.main > #mainMemory,
 main.main > #mainTasks,
+main.main > #mainActivity,
 main.main > #mainKanban,
 main.main > #mainWorkspaces,
 main.main > #mainProfiles,
 main.main > #mainInsights,
 main.main > #mainLogs{display:none;}
-main.main:not(.showing-settings):not(.showing-skills):not(.showing-memory):not(.showing-tasks):not(.showing-kanban):not(.showing-workspaces):not(.showing-profiles):not(.showing-insights):not(.showing-logs):not(.showing-plugin) > #mainChat{display:flex;}
+main.main:not(.showing-settings):not(.showing-skills):not(.showing-memory):not(.showing-tasks):not(.showing-activity):not(.showing-kanban):not(.showing-workspaces):not(.showing-profiles):not(.showing-insights):not(.showing-logs):not(.showing-plugin) > #mainChat{display:flex;}
 main.main.showing-settings > #mainSettings{display:flex;overflow-y:auto;}
 main.main.showing-skills > #mainSkills{display:flex;}
 main.main.showing-memory > #mainMemory{display:flex;}
 main.main.showing-tasks > #mainTasks{display:flex;}
+main.main.showing-activity > #mainActivity{display:flex;overflow-y:auto;}
 main.main.showing-kanban > #mainKanban{display:flex;overflow-y:auto;}
 main.main.showing-workspaces > #mainWorkspaces{display:flex;}
 main.main.showing-profiles > #mainProfiles{display:flex;}
@@ -4955,6 +4961,66 @@ main.main > #mainPlugin{display:none;}
 #mainPlugin .main-view-body{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 #pluginPageContainer{flex:1;display:flex;flex-direction:column;min-height:0;}
 #mainSettings{overflow-y:auto;}
+
+/* JarViz Agent Tasks / Activity — follows existing panel colors and spacing. */
+.jarviz-sidebar-summary{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;line-height:1.45;}
+.jarviz-sidebar-list{padding:8px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;}
+.jarviz-sidebar-heading{padding:8px 6px 3px;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;}
+.jarviz-sidebar-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border-radius:8px;background:var(--surface);font-size:11px;}
+.jarviz-sidebar-row strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600;text-transform:capitalize;}
+.jarviz-sidebar-row span{flex-shrink:0;color:var(--muted);text-transform:capitalize;}
+.jarviz-view-subtitle{margin-top:3px;color:var(--muted);font-size:12px;font-weight:400;}
+.jarviz-activity-body{width:min(1100px,100%);margin:0 auto;padding:20px;display:flex;flex-direction:column;gap:18px;}
+.jarviz-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}
+.jarviz-stat{padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:3px;}
+.jarviz-stat strong{font-size:22px;line-height:1.1;color:var(--text);}
+.jarviz-stat span{font-size:11px;color:var(--muted);}
+.jarviz-section{display:flex;flex-direction:column;gap:10px;}
+.jarviz-section-header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.jarviz-section-header h2{margin:0;font-size:14px;font-weight:650;color:var(--text);}
+.jarviz-section-header span{font-size:11px;color:var(--muted);}
+.jarviz-task-tree,.jarviz-completed-list{display:flex;flex-direction:column;gap:8px;}
+.jarviz-task-node{display:flex;flex-direction:column;gap:8px;margin-left:calc(var(--jarviz-depth,0) * 22px);position:relative;}
+.jarviz-task-node .jarviz-task-node{border-left:1px solid var(--border);padding-left:12px;}
+.jarviz-task-card{border:1px solid var(--border);border-left:3px solid var(--muted);border-radius:10px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:7px;min-width:0;}
+.jarviz-task-card.status-running{border-left-color:var(--accent);}
+.jarviz-task-card.status-completed{border-left-color:var(--success,#2ca66f);}
+.jarviz-task-card.status-blocked,.jarviz-task-card.status-awaiting_approval{border-left-color:var(--warning,#d9982f);}
+.jarviz-task-card.status-failed{border-left-color:var(--error,#e05);}
+.jarviz-task-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.jarviz-task-title{font-size:13px;font-weight:650;color:var(--text);overflow-wrap:anywhere;}
+.jarviz-status{flex-shrink:0;padding:3px 7px;border-radius:999px;background:var(--accent-bg);color:var(--accent-text);font-size:10px;font-weight:650;text-transform:capitalize;}
+.jarviz-task-meta{font-size:11px;color:var(--muted);text-transform:capitalize;}
+.jarviz-task-request{font-size:12px;line-height:1.45;color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere;}
+.jarviz-notice,.jarviz-project-notice{padding:8px 10px;border-radius:7px;background:var(--bg);border:1px solid var(--border);font-size:11px;line-height:1.45;color:var(--muted);}
+.jarviz-notice.error{color:var(--error,#e05);border-color:color-mix(in srgb,var(--error,#e05) 35%,var(--border));}
+.jarviz-notice.blocked,.jarviz-notice.approval{color:var(--warning,#d9982f);border-color:color-mix(in srgb,var(--warning,#d9982f) 35%,var(--border));}
+.jarviz-project-notice{display:flex;flex-direction:column;gap:4px;color:var(--warning,#d9982f);}
+.jarviz-project-notice strong{color:var(--text);}
+.jarviz-artifacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:3px;font-size:11px;}
+.jarviz-artifacts strong{color:var(--muted);margin-right:2px;}
+.jarviz-artifacts span{padding:3px 7px;border-radius:6px;background:var(--bg);border:1px solid var(--border);overflow-wrap:anywhere;}
+.jarviz-empty{padding:24px;border:1px dashed var(--border);border-radius:10px;color:var(--muted);display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;font-size:12px;}
+.jarviz-empty strong{color:var(--text);font-size:13px;}
+.jarviz-transcript-activity{width:min(760px,calc(100% - 28px));margin:18px auto 8px;border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;flex-shrink:0;}
+.jarviz-transcript-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;border-bottom:1px solid var(--border);font-size:12px;}
+.jarviz-transcript-header strong{color:var(--text);font-size:12px;}
+.jarviz-transcript-header span,.jarviz-transcript-note{color:var(--muted);font-size:11px;}
+.jarviz-transcript-event{padding:9px 13px;border-bottom:1px solid var(--border-subtle,var(--border));border-left:3px solid var(--muted);}
+.jarviz-transcript-event.event-started,.jarviz-transcript-event.event-delegated{border-left-color:var(--accent);}
+.jarviz-transcript-event.event-blocked,.jarviz-transcript-event.event-approval{border-left-color:var(--warning,#d9982f);}
+.jarviz-transcript-event.event-failed{border-left-color:var(--error,#e05);}
+.jarviz-transcript-event.event-completed{border-left-color:var(--success,#2ca66f);}
+.jarviz-transcript-event-main{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;align-items:baseline;gap:9px;font-size:12px;}
+.jarviz-transcript-event-main strong{color:var(--text);}
+.jarviz-transcript-event-main span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.jarviz-transcript-event-main time{color:var(--muted);font-size:10px;}
+.jarviz-transcript-event details{margin-top:7px;font-size:11px;color:var(--muted);}
+.jarviz-transcript-event summary{cursor:pointer;width:max-content;}
+.jarviz-transcript-event pre{margin:7px 0 0;padding:9px;border-radius:7px;background:var(--bg);color:var(--text);font:inherit;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;}
+.jarviz-transcript-note{padding:8px 13px;text-align:center;}
+@media(max-width:700px){.jarviz-activity-body{padding:12px}.jarviz-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.jarviz-section-header{align-items:flex-start;flex-direction:column;gap:3px}.jarviz-task-node{margin-left:calc(var(--jarviz-depth,0) * 10px)}}
+@media(max-width:700px){.jarviz-transcript-event-main{grid-template-columns:1fr max-content}.jarviz-transcript-event-main span{grid-column:1/-1;grid-row:2}.jarviz-transcript-activity{width:calc(100% - 18px)}}
 
 /* Sidebar menu (lives in the left sidebar under the cog panel) */
 .panel-view#panelSettings{gap:0;padding:0;}

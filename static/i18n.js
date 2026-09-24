@@ -29,8 +29,8 @@ const LOCALES = {
     voice_recording_active: 'Stop recording',
     dictation_append_label: 'Append dictation to composer',
     dictation_append_desc: 'When ON, dictated text is appended to any text already in the composer (with a space if needed). When OFF, dictated text replaces the composer content.',
-    voice_mode_toggle: 'Voice mode',
-    voice_mode_toggle_active: 'Exit voice mode',
+    voice_mode_toggle: 'Gemini Live',
+    voice_mode_toggle_active: 'End Gemini Live',
     // Turn-based voice mode (#1333)
     voice_listening: 'Listening…',
     voice_speaking: 'Speaking…',
@@ -1202,8 +1202,8 @@ const LOCALES = {
     settings_label_tts_auto_read: 'Auto-read responses aloud',
     settings_desc_tts_auto_read: 'Automatically speak each new assistant response when it finishes. Pauses when you start typing.',
     // Composer voice-mode pref (#1488)
-    settings_label_voice_mode: 'Hands-free voice mode button',
-    settings_desc_voice_mode: 'Show the voice-mode button (audio waveform) next to the dictation mic. Lets you speak naturally — Hermes auto-sends after a pause and reads replies aloud. Requires a browser that supports both speech recognition and TTS.',
+    settings_label_voice_mode: 'Gemini Live voice button',
+    settings_desc_voice_mode: 'Show the Gemini Live button next to dictation. Audio streams directly between this browser and Gemini using a short-lived credential; actions are limited to JarViz controls.',
     settings_label_raw_audio: 'Send raw audio instead of transcribing',
     settings_desc_raw_audio: 'Record and send the original audio file to the agent instead of converting it to text first. The agent can then transcribe it or process the raw audio (emotion, background noise, custom STT). Like Telegram\'s voice message behavior.',
     voice_send_raw: 'Send raw audio',

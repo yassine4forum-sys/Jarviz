@@ -677,6 +677,7 @@ function _micToastKeyForRecognitionError(error){
 }
 
 (function(){
+  if(window.JarVizLive){ window.JarVizLive.init(); return; }
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
   const _canRecordAudio=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
   if(!SpeechRecognition&&!_canRecordAudio) return; // Browser unsupported — mic button stays hidden

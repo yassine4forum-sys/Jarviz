@@ -6111,6 +6111,9 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         _handleBgTaskCompleteEvent(e, activeSid, {source:'stream'});
       }
     });
+    source.addEventListener('jarviz_task_event',e=>{
+      if(typeof handleJarvizTaskEvent==='function') handleJarvizTaskEvent(e,activeSid);
+    });
 
     source.addEventListener('done',e=>{
       if(_streamFinalized) return;
@@ -8173,6 +8176,10 @@ function _resumeSessionStreamAfterLiveChat(sid) {
 
 function startSessionStream(sid) {
   if (!sid) return;
+  // JarViz live events are hints; hydrate from SQLite-backed API whenever the
+  // owning session stream starts or reconnects so missed frames cannot leave
+  // the activity view stale.
+  if (typeof loadJarvizTasks === 'function') void loadJarvizTasks(sid, true);
   // Already on this session? No-op (loadSession is a no-op when re-selecting
   // the same session; this defends against external re-callers).
   if (_sessionStreamSessionId === sid && _sessionEventSource) return;
@@ -8243,7 +8250,12 @@ function startSessionStream(sid) {
       + (_knownCount !== '' ? '&known_count=' + encodeURIComponent(_knownCount) : '');
     const es = new EventSource(_apiUrl(_streamUrl));
     _sessionEventSource = es;
-    es.addEventListener('initial', () => { /* connection confirmed */ });
+    es.addEventListener('initial', () => {
+      if (typeof loadJarvizTasks === 'function') void loadJarvizTasks(sid, true);
+    });
+    es.addEventListener('jarviz_task_event', e => {
+      if (typeof handleJarvizTaskEvent === 'function') handleJarvizTaskEvent(e, sid);
+    });
     es.addEventListener('bg_task_complete', e => {
       // Shared handler — same dedupe set as the in-turn STREAMS path.
       if (typeof _handleBgTaskCompleteEvent === 'function') {
