@@ -9161,6 +9161,7 @@ def _run_agent_streaming(
     model_provider=None,
     goal_related=False,
     moa_config=None,
+    jarviz_policy=None,
 ):
     """Run agent in background thread, writing SSE events to STREAMS[stream_id].
 
@@ -10599,6 +10600,10 @@ def _run_agent_streaming(
             _prefill_context = _load_webui_prefill_context(_cfg)
             _prefill_messages = _prefill_messages_with_webui_context(_prefill_context, _cfg)
             _prefill_messages = _normalize_prefill_messages_before_user_turn(_prefill_messages)
+            if jarviz_policy is not None:
+                # Restricted task runs receive only their explicit request and
+                # specialist policy. Ambient recall is retrieved deliberately.
+                _prefill_messages = []
             _main_request_overrides = _main_model_request_overrides(
                 _cfg,
                 effective_model=resolved_model,
@@ -10632,6 +10637,11 @@ def _run_agent_streaming(
                         _toolsets = _override
             except Exception as _ts_err:
                 print(f"[webui] WARNING: failed to read per-session toolsets for {session_id}: {_ts_err}", flush=True)
+
+            if jarviz_policy is not None:
+                from api.jarviz_orchestrator import TOOLSETS
+
+                _toolsets = list(TOOLSETS[jarviz_policy.category])
 
             # Fallback model chain from profile config (e.g. for rate-limit or
             # provider recovery). Match Hermes CLI/gateway semantics:
@@ -10806,10 +10816,15 @@ def _run_agent_streaming(
             if 'gateway_session_key' in _agent_params:
                 _agent_kwargs['gateway_session_key'] = session_id
 
+            if jarviz_policy is not None:
+                from api.jarviz_orchestrator import restricted_agent_factory
+
+                _AIAgent = restricted_agent_factory(_AIAgent, _agent_params, jarviz_policy)
+
             # ── Agent cache: reuse across messages in the same session ──
             # Mirrors gateway _agent_cache.  Keeps _user_turn_count alive so
             # injectionFrequency: "first-turn" actually suppresses after turn 1.
-            if ephemeral:
+            if ephemeral or jarviz_policy is not None:
                 agent = _AIAgent(**_agent_kwargs)
                 logger.debug('[webui] Created ephemeral agent for session %s', session_id)
             else:
@@ -11022,6 +11037,10 @@ def _run_agent_streaming(
                 "write_file, read_file, search_files, terminal workdir, and patch. "
                 "Never fall back to a hardcoded path when this tag is present."
             )
+            if jarviz_policy is not None and jarviz_policy.category != 'coding':
+                # Only the coding specialist needs filesystem location context.
+                workspace_ctx = ''
+                workspace_system_msg = 'Execute only the bounded JarViz task supplied for this run.'
             # Resolve personality prompt from config.yaml agent.personalities
             # (matches hermes-agent CLI behavior — passes via ephemeral_system_prompt)
             _personality_prompt = None
@@ -11057,6 +11076,10 @@ def _run_agent_streaming(
                 },
                 config_data=_cfg,
             )
+            if jarviz_policy is not None and jarviz_policy.parent_task_id is not None:
+                from api.jarviz_specialists import specialist_system_prompt
+
+                agent.ephemeral_system_prompt += "\n\n" + specialist_system_prompt(jarviz_policy.category)
             _pending_started_at = getattr(s, 'pending_started_at', None)
             meter().set_pending_started_at(stream_id, _pending_started_at)
             # Normal chat-start sets pending_started_at before spawning this thread;
@@ -11205,14 +11228,14 @@ def _run_agent_streaming(
                 agent.run_conversation,
                 user_message=user_message,
                 system_message=workspace_system_msg,
-                conversation_history=_sanitize_messages_for_agent(
+                conversation_history=([] if jarviz_policy is not None else _sanitize_messages_for_agent(
                     _previous_context_messages,
                     cfg=_cfg,
                     effective_model=resolved_model,
                     effective_provider=resolved_provider,
                     effective_base_url=resolved_base_url,
                     requested_provider=(_session_requested_provider or ""),
-                ),
+                )),
                 conversation_history_revision=_conversation_history_revision,
                 task_id=session_id,
                 persist_user_message=msg_text,
@@ -11760,8 +11783,9 @@ def _run_agent_streaming(
                             )
                             from api.config import SESSION_AGENT_CACHE as _SAC, SESSION_AGENT_CACHE_LOCK as _SAC_L
                             with _SAC_L:
-                                _SAC[session_id] = (agent, _agent_sig)
-                                _SAC.move_to_end(session_id)
+                                if jarviz_policy is None:
+                                    _SAC[session_id] = (agent, _agent_sig)
+                                    _SAC.move_to_end(session_id)
                             # Retry the conversation once with fresh credentials
                             _self_healed = True
                             _token_sent = False
@@ -13127,8 +13151,9 @@ def _run_agent_streaming(
                     )
                     from api.config import SESSION_AGENT_CACHE as _SAC2, SESSION_AGENT_CACHE_LOCK as _SAC2_L
                     with _SAC2_L:
-                        _SAC2[session_id] = (_heal_agent, _agent_sig)
-                        _SAC2.move_to_end(session_id)
+                        if jarviz_policy is None:
+                            _SAC2[session_id] = (_heal_agent, _agent_sig)
+                            _SAC2.move_to_end(session_id)
                     # Retry the conversation
                     _token_sent = False
                     try:
