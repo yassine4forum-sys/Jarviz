@@ -13797,6 +13797,22 @@ def handle_get(handler, parsed) -> bool:
             handler.end_headers()
         return True
 
+    if parsed.path.startswith("/api/projects/") and "/jarviz" in parsed.path:
+        from api.jarviz_projects import handle_project_extension
+
+        if handle_project_extension(handler, parsed, method="GET") is not False:
+            return True
+
+    if parsed.path == "/api/jarviz/tasks" or parsed.path.startswith("/api/jarviz/tasks/"):
+        from api.jarviz_routes import handle_jarviz_get
+
+        return handle_jarviz_get(handler, parsed)
+
+    if parsed.path == "/api/jarviz/persona":
+        from api.jarviz_live import handle_persona_get
+
+        return handle_persona_get(handler, parsed)
+
     if parsed.path.startswith("/api/") and not _guard_request_session_visibility(handler, parsed, method="GET"):
         return True
 
@@ -15220,6 +15236,43 @@ def handle_post(handler, parsed) -> bool:
         if diag:
             diag.finish()
         raise
+    if parsed.path.startswith("/api/projects/") and "/jarviz" in parsed.path:
+        from api.jarviz_projects import handle_project_extension
+
+        if handle_project_extension(handler, parsed, method="POST", body=body) is not False:
+            if diag:
+                diag.finish()
+            return True
+
+    if parsed.path == "/api/jarviz/tasks" or parsed.path.startswith("/api/jarviz/tasks/"):
+        from api.jarviz_routes import handle_jarviz_post
+
+        try:
+            return handle_jarviz_post(handler, parsed, body)
+        finally:
+            if diag:
+                diag.finish()
+
+    if parsed.path.startswith("/api/jarviz/live/"):
+        from api.jarviz_live import handle_live_post
+
+        try:
+            result = handle_live_post(handler, parsed, body)
+            if result is not False:
+                return result
+        finally:
+            if diag:
+                diag.finish()
+
+    if parsed.path == "/api/jarviz/persona":
+        from api.jarviz_live import handle_persona_post
+
+        try:
+            return handle_persona_post(handler, parsed, body)
+        finally:
+            if diag:
+                diag.finish()
+
     if not _guard_request_session_visibility(handler, parsed, body=body, method="POST"):
         if diag:
             diag.finish()
@@ -23226,11 +23279,14 @@ def _start_chat_stream_for_session(
     moa_config=None,
     external_runtime_owned: bool | None = None,
     regeneration=None,
+    jarviz_run=None,
 ):
     """Persist pending state, register an SSE channel, and start an agent turn."""
     if external_runtime_owned is None:
         external_runtime_owned = webui_gateway_chat_enabled(get_config())
     backend_is_gateway = bool(external_runtime_owned)
+    if jarviz_run is not None and backend_is_gateway:
+        return {"error": "JarViz restricted turns require the local runtime", "_status": 501}
     stale_response = _agent_runtime_barrier_response(
         external_runtime_owned=backend_is_gateway,
     )
@@ -23371,6 +23427,11 @@ def _start_chat_stream_for_session(
     diag.stage("worker_thread_start") if diag else None
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
+    if jarviz_run is not None:
+        from api.jarviz_orchestrator import run_task_worker
+
+        worker_target = run_task_worker
+        worker_kwargs["jarviz_run"] = jarviz_run
     if moa_config and not backend_is_gateway:
         worker_kwargs["moa_config"] = moa_config
     if backend_is_gateway:
@@ -23476,6 +23537,7 @@ def _start_run(
     moa_config=None,
     gateway_chat_enabled: bool | None = None,
     regeneration=None,
+    jarviz_run=None,
 ):
     """Shared start-run helper for /api/chat/start and start_session_turn.
 
@@ -23503,6 +23565,12 @@ def _start_run(
         runtime_adapter_runner_enabled,
     )
 
+    if jarviz_run is not None:
+        if runtime_adapter_runner_enabled() or gateway_chat_enabled is True or webui_gateway_chat_enabled(get_config()):
+            return {"error": "JarViz restricted turns require the local runtime", "_status": 501}
+        if jarviz_run.session_id != s.session_id:
+            return {"error": "JarViz origin mismatch", "_status": 400}
+
     if runtime_adapter_enabled() or runtime_adapter_runner_enabled():
         if regeneration is not None and runtime_adapter_runner_enabled():
             return {"error": "Regeneration is not supported by the runner backend.", "code": "unsupported_regeneration_backend", "_status": 409}
@@ -23520,6 +23588,7 @@ def _start_run(
                 moa_config=moa_config,
                 external_runtime_owned=gateway_chat_enabled,
                 regeneration=regeneration,
+                **({"jarviz_run": jarviz_run} if jarviz_run is not None else {}),
             )
 
         def _legacy_adapter_factory():
@@ -23562,6 +23631,7 @@ def _start_run(
         moa_config=moa_config,
         external_runtime_owned=gateway_chat_enabled,
         regeneration=regeneration,
+        **({"jarviz_run": jarviz_run} if jarviz_run is not None else {}),
     )
 
 
@@ -23621,6 +23691,7 @@ def start_session_turn(
     message: str,
     *,
     source: str = "process_wakeup",
+    jarviz_run=None,
 ):
     """Start a server-side agent turn for ``session_id`` with ``message``.
 
@@ -23818,6 +23889,7 @@ def start_session_turn(
         normalized_model=normalized_model,
         source=turn_source,
         route="start_session_turn",
+        **({"jarviz_run": jarviz_run} if jarviz_run is not None else {}),
     )
 
     # ── Defect B: live-view of server-initiated turns ──────────────────────
